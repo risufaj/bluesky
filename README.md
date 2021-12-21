@@ -10,8 +10,6 @@ python -m pip install -r requirements.txt
 
 Start the training by running:
 
-Install dependencies using pip.
-
 ```shell
 python main.py
 ```
