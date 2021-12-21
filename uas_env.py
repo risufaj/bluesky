@@ -231,25 +231,21 @@ def generate(tot_ac, conf_ac, radius, min_speed, max_speed, h_thresh):
     scenario += t + ">" + "DTLOOK 00:00:" + str(8) + "\n"
     scenario += tr + ">reset \n"
 
-    # with open("C:\\Users\\ralvi\\Desktop\\puna\\current-bluesky\\scenario\\test-example.scn","w") as f:
-    #        f.write(scenario)
-
     return cre_ac, scenario, generated_hdgs
 
 def loadscn():
-    path = os.getcwd() + "/scenario/rl3"
-    ac = 5  # sa drona duam ne konflikt, mund tjete me shum psh [2,3,4,5,6, etj]
+    path = os.getcwd() + "/scenario/"
+    ac = 5  
 
     num_ac_gjithsej = 3
 
-    rrezja = 5  # zonen qe duam te studiojm e perkufizojme me rreth, dhe kjo jep rrezen e rrethit.
-    # te gjith dronat krijohen brenda rrethit, normalisht sa me i vogel aq me i dendur trafiku. jepet ne nautical miles
-    min_speed = 5  # m/s. shpejtesia minimale qe mund t krijohen
-    max_speed = 15  # m/s
-    h_thresh = 240  # ne metra. distanca e siguris
+    rrezja = 5  
+    min_speed = 5  
+    max_speed = 15  
+    h_thresh = 240  
     lst, skenar,generated_hdgs = generate(num_ac_gjithsej, ac, rrezja, min_speed, max_speed, h_thresh)
     name = "sim" + "_" + str(ac) + "_" + str(0) + ".scn"
-    with open(path+'/'+name, "w") as f:  # ky pathi duhet ndryshuar,ama duhen krijuar brenda folderit scenario
+    with open(path+'/'+name, "w") as f:  
 
         f.write(skenar)
 
@@ -267,7 +263,7 @@ class Environment:
         bs.init("sim-detached")
         self.max_agents = max_agents
         self.timestep = 2 #decision making
-        self.agents_id_idx = {bs.traf.id[i]: i for i in range(bs.traf.ntraf)} #duhet ndryshu nqs vendosim qe duhet me qen vec ata n konflikt
+        self.agents_id_idx = {bs.traf.id[i]: i for i in range(bs.traf.ntraf)} 
         self.agents_id = []
         self.scenario = Saved_scenario()
         self.logger = DataLoggerLists(bs.traf.id)
@@ -287,7 +283,7 @@ class Environment:
         self.distinm = np.zeros(self.ini_n_planes, dtype=np.float32)
         self.qdr = np.zeros(self.ini_n_planes, dtype=np.float32)
 
-        self.reward_ind = np.zeros((self.ini_n_planes, 8), dtype=np.float32) # 8 do zevendsohet me sa faktor t reward do kemi
+        self.reward_ind = np.zeros((self.ini_n_planes, 8), dtype=np.float32) 
         self.distinm_diff = np.zeros(self.ini_n_planes, dtype=np.float32)
 
     def save_close_values(self, ac, minindex, distinm, qdr):
@@ -353,10 +349,10 @@ class Environment:
                 print("Recommended action for "+bs.traf.id[idx]+" is "+str(action)+" however it's not in a conflict so it must not take an action")
             else:
                 if action == 1:
-                    #print("Action is turn right by 15 degree")
+                    
                     bs.traf.ap.selhdgcmd(idx, bs.traf.hdg[idx] + 15)
                 elif action == 2:
-                    #print("Action is turn left by 15 degree")
+                    
                     bs.traf.ap.selhdgcmd(idx, bs.traf.hdg[idx] - 15)
                 else:
                     noaction = True
@@ -429,8 +425,7 @@ class Environment:
         return states, reward, adj, done,len(bs.traf.cd.lospairs_all), len(bs.traf.cd.nmacpairs_all), in_loss
 
     def check_agent_done(self):
-        pass #shif a ka arrit goal state boti
-
+        pass 
     def calculate_new_conflicts(self):
         new_conflicts = np.zeros(shape=(2))
         for acid_idx, acid in enumerate(list(self.confpairs.keys())[0]):
@@ -507,12 +502,6 @@ class Environment:
                 done = True
                 break
 
-        #try:
-        #    self.confpairs[list(bs.traf.cd.confpairs_unique)[0]] = [False, False]
-        #    self.confpair = list(bs.traf.cd.confpairs_unique)[0]
-        #except:
-        #    self.reset()
-
         self.tcpa = bs.traf.cd.tcpa[0]
         self.agents_step = []
         self.confpairs_list = []
@@ -546,7 +535,7 @@ class Environment:
             return True
 
         else:
-            print("asnjeri kush nuk plotsohet")
+            print("No conditions fulfilled")
             return False
 
     def adjency_matrix(self):
