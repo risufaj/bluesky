@@ -10,21 +10,6 @@ import torch.nn.functional as F
 USE_CUDA = torch.cuda.is_available()
 Variable = lambda *args, **kwargs: autograd.Variable(*args, **kwargs).cuda() if USE_CUDA else autograd.Variable(*args,
                                                                                                                 **kwargs)
-
-class ATT(nn.Module):
-	def __init__(self, din):
-		super(ATT, self).__init__()
-		self.fc1 = nn.Linear(din, 64)
-		self.fc2 = nn.Linear(64, 64)
-		self.fc3 = nn.Linear(64, 1)
-
-	def forward(self, x):
-		y = F.relu(self.fc1(x))
-		y = F.relu(self.fc2(y))
-		y = F.sigmoid(self.fc3(y))
-		return y
-
-
 class Encoder(nn.Module):
     def __init__(self, din=32, hidden_dim=128):
         super(Encoder, self).__init__()
