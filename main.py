@@ -44,7 +44,7 @@ observation_space = 4#n_ant * 4
 n_actions = 3 #move right, left, do nothing
 
 #buff = ReplayBuffer(capacity)
-buff = ReplayBuffer(capacity,observation_space,n_actions,n_ant)
+buff = ReplayBuffer(capacity)
 model = DGN(max_agents,observation_space,hidden_dim,n_actions)
 load_model(model)
 model_tar = DGN(max_agents,observation_space,hidden_dim,n_actions)
