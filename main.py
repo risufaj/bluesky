@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.autograd as autograd
 import torch.nn.functional as F
-from DGN import DGN, ATT
+from DGN import DGN
 from config import *
 import numpy as np
 import pandas as pd
@@ -19,14 +19,14 @@ USE_CUDA = torch.cuda.is_available()
 
 
 def save_model(m, episode):
-    torch.save(m.state_dict(), 'models/v5model3episode_'+str(episode)+'.pth')
+    torch.save(m.state_dict(), 'models/model_'+str(episode)+'.pth')
 
 
 def load_model(m):
     start = 'models/'
     end = '.pth'
     saves = []
-    for file in glob.glob('models/agents5*'):
+    for file in glob.glob('models/model*'):
         print(file)
         _, episode = file[file.find(start)+len(start):file.rfind(end)].split('_')
         saves.append(int(episode))
@@ -34,10 +34,10 @@ def load_model(m):
     if len(saves) > 0:
         latest = max(saves)
         print(saves)
-        m.load_state_dict(torch.load('models/agents5episode_'+str(latest)+'.pth'))
+        m.load_state_dict(torch.load('models/model_'+str(latest)+'.pth'))
 
 
-env = Environment(n_agents=5,max_agents=5)
+env = Environment(n_agents=4,max_agents=4)
 max_agents = env.max_agents
 n_ant = env.ini_n_planes
 observation_space = 4#n_ant * 4
@@ -53,16 +53,6 @@ model = model.cuda()
 model_tar = model_tar.cuda()
 optimizer = optim.Adam(model.parameters(), lr = 0.0001)
 
-optimizer = optim.Adam(model.parameters(), lr = 0.0001)
-att = ATT(observation_space).cuda()
-att_tar = ATT(observation_space).cuda()
-att_tar.load_state_dict(att.state_dict())
-optimizer_att = optim.Adam(att.parameters(), lr = 0.0001)
-criterion = nn.BCELoss()
-
-M_Null = torch.Tensor(np.array([np.eye(max_agents)]*batch_size)).cuda()
-M_ZERO = torch.Tensor(np.zeros((batch_size,max_agents,max_agents))).cuda()
-
 
 
 n_episodes = 50000
@@ -72,10 +62,10 @@ buffer_samples = 200
 results = []
 
 
-#O = np.ones((batch_size,max_agents,observation_space))
-#Next_O = np.ones((batch_size,max_agents,observation_space))
-#Matrix = np.ones((batch_size,max_agents,max_agents))
-#Next_Matrix = np.ones((batch_size,max_agents,max_agents))
+O = np.ones((batch_size,max_agents,observation_space))
+Next_O = np.ones((batch_size,max_agents,observation_space))
+Matrix = np.ones((batch_size,max_agents,max_agents))
+Next_Matrix = np.ones((batch_size,max_agents,max_agents))
 
 a = 0
 
@@ -89,8 +79,6 @@ if test:
     n_episodes = len(scenarios)
 
 for i_episode in range(n_episodes):
-    no_edges = []
-    no_edges_atoc = []
     score = 0
     episode_results = {}
     print("Starting episode ", i_episode)
@@ -115,8 +103,8 @@ for i_episode in range(n_episodes):
     problem = 0
     #print(problem)
     if not test:
-        if i_episode > 40:
-            epsilon -=0.001
+        if i_episode > 100:
+            epsilon -=0.0004
             if epsilon < 0.1:
                 epsilon = 0.1
     conflicts_timestep = []
@@ -126,17 +114,6 @@ for i_episode in range(n_episodes):
     while done == False:
 
         actions = []
-        no_edges.append(adj.sum())
-
-        v_a = np.array(att(torch.Tensor(np.array([observations])).cuda())[0].cpu().data)
-        for i in range(n_ant):
-            if np.random.rand() < epsilon:
-                adj[i] = adj[i] * 0 if np.random.rand() < 0.5 else adj[i] * 1
-            else:
-                adj[i] = adj[i] * 0 if v_a[i][0] < -0.1 else adj[i] * 1
-
-        adj = adj + np.eye(max_agents)
-        no_edges_atoc.append(adj.sum())
 
         q = model(torch.Tensor(np.array([observations])).cuda(), torch.Tensor(adj).cuda())[0]
         #q = model(torch.Tensor(np.array([observations])), torch.Tensor(adj))[0]
@@ -182,7 +159,7 @@ for i_episode in range(n_episodes):
 
     if not test:
 
-        if i_episode < 40:
+        if i_episode < 100:
             continue
 
 
@@ -193,86 +170,36 @@ for i_episode in range(n_episodes):
             mean_reward = []
             stdev_reward = []
 
+            for j in range(batch_size):
+                sample = batch[j]
+                O[j] = sample[0]
+                Next_O[j] = sample[3]
+                Matrix[j] = sample[4]
+                Next_Matrix[j] = sample[5]
 
-
-            O, A, R, Next_O, Matrix, Next_Matrix, D = batch
-            O = torch.Tensor(O).cuda()
-            Matrix = torch.Tensor(Matrix).cuda()
-            Next_O = torch.Tensor(Next_O).cuda()
-            Next_Matrix = torch.Tensor(Next_Matrix).cuda()
-
-            for i_a in range(n_ant):
-                #r = [x[2][i_a] for x in buff.buffer]
-                r = R[:,i]
-                mean_reward.append(mean(r))
-                stdev_reward.append(np.std(np.array(r)))
-                #mean_reward.append(mean(r))
-                #stdev_reward.append(np.std(np.array(r)))
-
-            label = model(Next_O, Next_Matrix + M_Null).max(dim=2)[0] - model(Next_O, M_Null).max(dim=2)[0]
-            label = (label - label.mean()) / (label.std() + 0.000001) + 0.5
-            label = torch.clamp(label, 0, 1).unsqueeze(-1).detach()
-            loss = criterion(att(Next_O), label)
-            optimizer_att.zero_grad()
-            loss.backward()
-            optimizer_att.step()
-
-            V_A_D = att_tar(Next_O).expand(-1, -1, n_ant)
-            Next_Matrix = torch.where(V_A_D > -0.1, Next_Matrix, M_ZERO)
-            Next_Matrix = Next_Matrix + M_Null
-
-            q_values = model(O, Matrix)
-            target_q_values = model_tar(Next_O, Next_Matrix).max(dim=2)[0]
-            target_q_values = np.array(target_q_values.cpu().data)
+            q_values = model(torch.Tensor(O).cuda(), torch.Tensor(Matrix).cuda())
+            ##q_values = model(torch.Tensor(O), torch.Tensor(Matrix))
+            target_q_values = model_tar(torch.Tensor(Next_O).cuda(), torch.Tensor(Next_Matrix).cuda()).max(dim=2)[0]
+            ##target_q_values = model_tar(torch.Tensor(Next_O), torch.Tensor(Next_Matrix)).max(dim=2)[0]
+            #target_q_values = np.array(target_q_values.cpu().data)
             expected_q = np.array(q_values.cpu().data)
 
             for j in range(batch_size):
+                sample = batch[j]
                 for i in range(n_ant):
-                    expected_q[j][i][A[j][i]] = (R[j][i] - mean_reward[i])/(stdev_reward[i]+0.001) + (1 - D[j]) * GAMMA * target_q_values[j][i]
+                    expected_q[j][i][sample[1][i]] = (sample[2][i]-mean_reward[i])/(stdev_reward[i]+0.01) + (1 - sample[6]) * GAMMA * target_q_values[j][i]
 
             loss = (q_values - torch.Tensor(expected_q).cuda()).pow(2).mean()
+            loss = (q_values - torch.Tensor(expected_q)).pow(2).mean()
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
-            with torch.no_grad():
-                for p, p_targ in zip(model.parameters(), model_tar.parameters()):
-                    p_targ.data.mul_(tau)
-                    p_targ.data.add_((1 - tau) * p.data)
-                for p, p_targ in zip(att.parameters(), att_tar.parameters()):
-                    p_targ.data.mul_(tau)
-                    p_targ.data.add_((1 - tau) * p.data)
-
-            #for j in range(batch_size):
-            #    sample = batch[j]
-            #    O[j] = sample[0]
-            #    Next_O[j] = sample[3]
-            #    Matrix[j] = sample[4]
-            #    Next_Matrix[j] = sample[5]
-
-            #q_values = model(torch.Tensor(O).cuda(), torch.Tensor(Matrix).cuda())
-            ##q_values = model(torch.Tensor(O), torch.Tensor(Matrix))
-            #target_q_values = model_tar(torch.Tensor(Next_O).cuda(), torch.Tensor(Next_Matrix).cuda()).max(dim=2)[0]
-            ##target_q_values = model_tar(torch.Tensor(Next_O), torch.Tensor(Next_Matrix)).max(dim=2)[0]
-            #target_q_values = np.array(target_q_values.cpu().data)
-            #expected_q = np.array(q_values.cpu().data)
-
-            #for j in range(batch_size):
-            #    sample = batch[j]
-            #    for i in range(n_ant):
-            #        expected_q[j][i][sample[1][i]] = (sample[2][i]-mean_reward[i])/(stdev_reward[i]+0.01) + (1 - sample[6]) * GAMMA * target_q_values[j][i]
-
-            #loss = (q_values - torch.Tensor(expected_q).cuda()).pow(2).mean()
-            #loss = (q_values - torch.Tensor(expected_q)).pow(2).mean()
-            #optimizer.zero_grad()
-            #loss.backward()
-            #optimizer.step()
-
-        #if i_episode % 5 == 0:
-        #    model_tar.load_state_dict(model.state_dict())
+        if i_episode % 5 == 0:
+            model_tar.load_state_dict(model.state_dict())
         if i_episode % 200 == 0:
             df = pd.DataFrame(results)
-            df.to_csv('agents5scores_'+str(i_episode)+'.csv')
+            df.to_csv('scores_'+str(i_episode)+'.csv')
             save_model(model,i_episode)
 if test:
     df = pd.DataFrame(results)
