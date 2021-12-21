@@ -1,5 +1,7 @@
 # Multi-UAV Conflict Resolution with Graph Convolutional Reinforcement Learning
 
+[![Open in Visual Studio Code](https://open.vscode.dev/badges/open-in-vscode.svg)](https://open.vscode.dev/risufaj/bluesky)
+
 This is the code supporting the paper "Multi-UAV Conflict Resolution with Graph Convolutional Reinforcement Learning". The model is built on the open source simulator BlueSky. 
 
 Install dependencies using pip.
